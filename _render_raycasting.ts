@@ -62,6 +62,7 @@ namespace Render {
         protected tilemapScaleSize = 1 << TileScale.Sixteen
         map: tiles.TileMapData
         bg: Image
+
         textures: Image[]
         protected oldRender: scene.Renderable
         protected myRender: scene.Renderable
@@ -70,6 +71,7 @@ namespace Render {
         protected wallHeightInView: number
         protected wallWidthInView: number
         protected dist: number[] = []
+
         //render perf const
         cameraRangeAngle: number
         viewZPos: number
@@ -83,6 +85,10 @@ namespace Render {
         protected transformX: number[] = []
         protected transformY: number[] = []
         protected angleSelfToSpr: number[] = []
+
+        //floor
+        wallEnd: number[] = []  //X
+        floorImage: Image 
 
         onSpriteDirectionUpdateHandler: (spr: Sprite, dir: number) => void
 
@@ -302,12 +308,12 @@ namespace Render {
 
             let frameCallback_draw = sc.eventContext.registerFrameHandler(scene.RENDER_SPRITES_PRIORITY + 1, () => {
                 if (this._viewMode == ViewMode.tilemapView) {
-                    screen.drawImage(sc.background.image, 0, 0)
+                  //  screen.drawImage(sc.background.image, 0, 0)
                     this.oldRender.__drawCore(sc.camera)
                     this.sprites.forEach(spr => spr.__draw(sc.camera))
                     this.sprSelf.__draw(sc.camera)
                 } else {
-                    this.tempScreen.drawImage(sc.background.image, 0, 0)
+                 //   this.tempScreen.drawImage(sc.background.image, 0, 0)
                     //debug
                     // const ms=control.micros()
                     this.render()
@@ -329,6 +335,14 @@ namespace Render {
             //     scene.TILE_MAP_Z,
             //     (t, c) => this.trace(t, c)
             // )
+
+            //floor
+            const floorW = (this.map.width - 2) * this.tilemapScaleSize
+            const floorH = (this.map.height - 2) * this.tilemapScaleSize
+            this.floorImage = image.create(floorW, floorH)
+       //     for(let i=0;i <1000; i++)
+       //         this.floorImage.setPixel(randint(0, floorW), randint(0, floorH),6)
+           // tilemapToImg.generateImage(this.map, this.floorImage)
 
         }
 
@@ -507,16 +521,18 @@ namespace Render {
 
             
 
-
-            const tex = assets.image`testBackground`
+            //floor
+         //   const floorTex = assets.image`testFloor`
             let rayDirX0 = this.dirXFpx / fpx_scale + (this.planeX / fpx_scale)
             let rayDirY0 = this.dirYFpx / fpx_scale + (this.planeY / fpx_scale)
             let rayDirX1 = this.dirXFpx / fpx_scale - (this.planeX / fpx_scale)
             let rayDirY1 = this.dirYFpx / fpx_scale - (this.planeY / fpx_scale)
-            let fmapX = this.selfXFpx / fpx_scale * 16
-            let fmapY = this.selfYFpx / fpx_scale * 16
+
             let stepDirX = Fx14( (rayDirX1 - rayDirX0) / SW)
             let stepDirY = Fx14( (rayDirY1 - rayDirY0) / SW)
+            let floorStartY = SH
+
+            
 
             const sc = game.currentScene() 
            // background
@@ -524,40 +540,10 @@ namespace Render {
             let backgroundOffset = (this._angle / Math.PI * speed ) % 1  // range -1..1
             if (backgroundOffset < 0) backgroundOffset++  // range 0..1
             backgroundOffset *= SW    // range 0..screenwidth
+            this.tempScreen.drawImage(sc.background.image, -backgroundOffset +SW,0)
+            this.tempScreen.drawImage(sc.background.image, -backgroundOffset , 0)
+
             
-            //floor       
-            let posZ = Fx14(SH * this.viewZPos / this.tilemapScaleSize / fpx_scale * 16)
-            for (let y = 60; y < SH; y++) {
-    
-                let rowDistance = F14.idiv(posZ, y - SHHalf)
-                let floorStepX = F14.mulLL(rowDistance , stepDirX)
-                let floorStepY = F14.mulLL(rowDistance, stepDirY)
-                let floorX = F14.iadd(fmapX, F14.mulLL(rowDistance, Fx14(rayDirX0)))
-                let floorY = F14.iadd(fmapY, F14.mulLL(rowDistance, Fx14(rayDirY0)))
-
-                for (let x = 0; x < SW; x++) {
-
-                    let tx = F14.toIntFloor(floorX)
-                    let ty = F14.toIntFloor(floorY)
-
-                    
-                    
-
-                    let tileType = this.map.getTile(tx >> 4, ty >> 4)
-                    let floorTex = this.textures[tileType]
-            
-
-                    let c = floorTex.getPixel(tx % 16, ty % 16)
-                    this.tempScreen.setPixel(x, y, c)
-
-                    floorX = F14.add(floorX, floorStepX)
-                    floorY = F14.add(floorY, floorStepY)
-
-                }
-
-
-
-            }
             
             // walls
             
@@ -647,13 +633,14 @@ namespace Render {
                 //     texX = tex.width - texX - 1;
 
                 const lineHeight = (this.wallHeightInView / perpWallDist)
-                const drawEnd = lineHeight * this.viewZPos / this.tilemapScaleSize / fpx_scale;
+                let drawEnd = lineHeight * this.viewZPos / this.tilemapScaleSize / fpx_scale;
                 const horizontBreak = 1 - this.viewZPos / this.tilemapScaleSize / fpx_scale;
                 if (perpWallDist !== lastDist && (texX !== lastTexX || mapX !== lastMapX || mapY !== lastMapY)) {//neighbor line of tex share same parameters
                      
                     drawStart = drawEnd - lineHeight * (this._wallZScale) ;
                     drawHeight = (Math.ceil(drawEnd) - Math.ceil(drawStart) )
                     drawStart += (SH >> 1)
+                    drawEnd += (SH >> 1)
 
                     lastDist = perpWallDist
                     lastTexX = texX
@@ -663,24 +650,48 @@ namespace Render {
                 //fix start&end points to avoid regmatic between lines
                
 
-                //if (x < SWHalf)
-                    this.tempScreen.blitRow(x, drawStart, tex, texX, drawHeight)
-                //else
-                //    this.blitRowBreak(x, SHHalf + drawEnd - lineHeight, SHHalf + drawEnd, tex, texX, tex.height * horizontBreak)
-
+                this.tempScreen.blitRow(x, drawStart, tex, texX, drawHeight)
+               //    this.blitRowBreak(x, SHHalf + drawEnd - lineHeight, SHHalf + drawEnd, tex, texX, tex.height * horizontBreak)
+                this.wallEnd[x] = Math.ceil(drawStart) + drawHeight -1
+                if (this.wallEnd[x] < floorStartY) floorStartY = this.wallEnd[x]
                 this.dist[x] = perpWallDist
 
-                // background 
-              /*  for (let y = 0; y < drawStart; y++ ){
-                    let backX = (backgroundOffset + x) % SW
-                    let c = sc.background.image.getPixel(backX,y)
-                    this.tempScreen.setPixel(x,y,c)               
-                }
-                */
+
             }
+
+
+            //floor       
+            let fmapX = this.selfXFpx / fpx_scale * 16
+            let fmapY = this.selfYFpx / fpx_scale * 16
+            let posZ = Fx14(SH * this.viewZPos / this.tilemapScaleSize / fpx_scale * 16)
+            for (let y = floorStartY;  y < SH; y++) {
+
+                let rowDistance = F14.idiv(posZ, y - SHHalf)
+                let floorStepX = F14.mulLL(rowDistance, stepDirX)
+                let floorStepY = F14.mulLL(rowDistance, stepDirY)
+                let floorX = F14.iadd(fmapX, F14.mulLL(rowDistance, Fx14(rayDirX0)))
+                let floorY = F14.iadd(fmapY, F14.mulLL(rowDistance, Fx14(rayDirY0)))
+               
+                for (let x = 0; x < SW; x ++) {
+                    if (y > this.wallEnd[x]) {
+                        let tx = F14.toIntFloor(floorX)
+                        let ty = F14.toIntFloor(floorY)
+
+                      //  let tileType = this.map.getTile(tx >> 4, ty >> 4)
+                      //  let floorTex = this.textures[tileType]
+
+                    //    let c = floorTex.getPixel(tx , ty  )
+                     //   if (!c) c = tex.getPixel(tx % 64, ty % 64 )
+                     //   if (c) this.tempScreen.setPixel(x, y, c)
+                    }
+                    floorX = F14.add(floorX, floorStepX)
+                    floorY = F14.add(floorY, floorStepY)
+                }
+            }
+
             //debug
             // info.setScore(control.millis()-ms)
-           // this.tempScreen.print(backgroundOffset.toString(), 0,0,7 )
+           // this.tempScreen.print(this.tilemapScaleSize.toString(), 0,0,7 )
            // this.tempScreen.print([Math.roundWithPrecision(this._angle, 3)].join(), 20, 5)
 
             this.drawSprites()
