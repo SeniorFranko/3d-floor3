@@ -336,12 +336,17 @@ namespace Render {
             //     (t, c) => this.trace(t, c)
             // )
 
-            //floor
+            //FLOOR  / convert tilemap to 
             const floorW = (this.map.width - 2) * this.tilemapScaleSize
             const floorH = (this.map.height - 2) * this.tilemapScaleSize
             this.floorImage = image.create(floorW, floorH)
-       //     for(let i=0;i <1000; i++)
-       //         this.floorImage.setPixel(randint(0, floorW), randint(0, floorH),6)
+            for (let x = 0; x < this.map.width - 2; x++)
+                for (let y = 0; y < this.map.height - 2; y++) {
+                    let tileType = this.map.getTile(x +1, y +1)
+                    let floorTex = this.textures[tileType]
+                    this.floorImage.drawTransparentImage(floorTex, x * this.tilemapScaleSize, y * this.tilemapScaleSize)
+                }
+             
            // tilemapToImg.generateImage(this.map, this.floorImage)
 
         }
@@ -513,8 +518,8 @@ namespace Render {
 
             let drawStart = 0
             let drawHeight = 0
-            let lastDist = -1, lastTexX = -1, lastMapX = -1, lastMapY = -1
-            this.viewZPos = this.spriteMotionZ[this.sprSelf.id].p + (this.sprSelf._height as any as number) - (2 << fpx) + this.cameraOffsetZ_fpx
+            let lastDist = -1, lastTexX = -1, lastMapX = -1, lastMapY = -1 //(this.sprSelf._height as any as number)
+            this.viewZPos = this.spriteMotionZ[this.sprSelf.id].p + 500  + this.cameraOffsetZ_fpx
             let cameraRangeAngle = Math.atan(this.fov) + .1 //tolerance for spr center just out of camera
             //debug
             // const ms=control.millis()
@@ -528,8 +533,7 @@ namespace Render {
             let rayDirX1 = this.dirXFpx / fpx_scale - (this.planeX / fpx_scale)
             let rayDirY1 = this.dirYFpx / fpx_scale - (this.planeY / fpx_scale)
 
-            let stepDirX = Fx14( (rayDirX1 - rayDirX0) / SW)
-            let stepDirY = Fx14( (rayDirY1 - rayDirY0) / SW)
+
             let floorStartY = SH
 
             
@@ -661,37 +665,53 @@ namespace Render {
 
 
             //floor       
-            let fmapX = this.selfXFpx / fpx_scale * 16
-            let fmapY = this.selfYFpx / fpx_scale * 16
-            let posZ = Fx14(SH * this.viewZPos / this.tilemapScaleSize / fpx_scale * 16)
+            let stepDirX = ((rayDirX1 - rayDirX0) / SW)
+            let stepDirY = ((rayDirY1 - rayDirY0) / SW)
+        //    let fmapX = (this.selfXFpx / fpx_scale - 1) * this.tilemapScaleSize
+        //    let fmapY = (this.selfYFpx / fpx_scale - 1) * this.tilemapScaleSize
+            let fmapX14 = Fx14((this.selfXFpx / fpx_scale -1 ) * this.tilemapScaleSize)
+            let fmapY14 = Fx14((this.selfYFpx / fpx_scale -1 ) * this.tilemapScaleSize)
+        //    let posZ = (SH * this.viewZPos / fpx_scale)
+            let posZ14 = Fx14(SH * this.viewZPos  / fpx_scale )
             for (let y = floorStartY;  y < SH; y++) {
 
-                let rowDistance = F14.idiv(posZ, y - SHHalf)
-                let floorStepX = F14.mulLL(rowDistance, stepDirX)
-                let floorStepY = F14.mulLL(rowDistance, stepDirY)
-                let floorX = F14.iadd(fmapX, F14.mulLL(rowDistance, Fx14(rayDirX0)))
-                let floorY = F14.iadd(fmapY, F14.mulLL(rowDistance, Fx14(rayDirY0)))
-               
+         //       let rowDistance = (posZ / (y - SHHalf)) 
+                let rowDistance14 = F14.idiv(posZ14, (y - SHHalf))
+         //       let floorStepX = rowDistance *  stepDirX
+         //       let floorStepY = rowDistance * stepDirY
+                let floorStepX14 = F14.mulLL(rowDistance14, Fx14(stepDirX))
+                let floorStepY14 = F14.mulLL(rowDistance14, Fx14(stepDirY))
+         //       let floorX = fmapX + rowDistance * rayDirX0//F14.iadd(fmapX, F14.mul2(rowDistance, Fx14(rayDirX0)))
+         //       let floorY = fmapY + rowDistance * rayDirY0//F14.iadd(fmapY, F14.mul2(rowDistance, Fx14(rayDirY0)))
+                let floorX14 = F14.add(fmapX14, F14.mulLL(rowDistance14 , Fx14(rayDirX0)))
+                let floorY14 = F14.add(fmapY14, F14.mulLL(rowDistance14, Fx14(rayDirY0)))
+
+
                 for (let x = 0; x < SW; x ++) {
                     if (y > this.wallEnd[x]) {
-                        let tx = F14.toIntFloor(floorX)
-                        let ty = F14.toIntFloor(floorY)
+                        //let tx = Math.floor(floorX)//F14.toIntFloor(floorX)
+                       // let ty = Math.floor(floorY)//F14.toIntFloor(floorY)
+                        let tx = F14.toIntFloor(floorX14)
+                        let ty = F14.toIntFloor(floorY14)
+
 
                       //  let tileType = this.map.getTile(tx >> 4, ty >> 4)
                       //  let floorTex = this.textures[tileType]
 
-                    //    let c = floorTex.getPixel(tx , ty  )
-                     //   if (!c) c = tex.getPixel(tx % 64, ty % 64 )
-                     //   if (c) this.tempScreen.setPixel(x, y, c)
+                        let c = this.floorImage.getPixel(tx , ty  )
+                        if (c) this.tempScreen.setPixel(x, y, c)
                     }
-                    floorX = F14.add(floorX, floorStepX)
-                    floorY = F14.add(floorY, floorStepY)
+                 //   floorX = floorX+floorStepX//F14.add(floorX, floorStepX)
+                 //   floorY = floorY +floorStepY // F14.add(floorY, floorStepY)
+                    floorX14 = F14.add(floorX14, floorStepX14)
+                    floorY14 = F14.add(floorY14, floorStepY14)
                 }
             }
 
             //debug
             // info.setScore(control.millis()-ms)
-           // this.tempScreen.print(this.tilemapScaleSize.toString(), 0,0,7 )
+            let test = this.spriteMotionZ[this.sprSelf.id].p//(2 << fpx) + this.cameraOffsetZ_fpx//(this.sprSelf._height as any as number)
+            this.tempScreen.print(this.viewZPos.toString(), 0,0,7 )
            // this.tempScreen.print([Math.roundWithPrecision(this._angle, 3)].join(), 20, 5)
 
             this.drawSprites()
