@@ -48,6 +48,8 @@ namespace Render {
         protected _viewMode = ViewMode.raycastingView
         protected dirXFpx: number
         protected dirYFpx: number
+        dirX14: Fx14
+        dirY14: Fx14
         protected planeX: number
         protected planeY: number
         protected _angle: number
@@ -85,7 +87,9 @@ namespace Render {
 
         //render perf const
         cameraRangeAngle: number
-        viewZPos: number
+        viewZPos: Fx14
+        selfX14: Fx14     
+        selfY14: Fx14
         selfXFpx: number
         selfYFpx: number
 
@@ -250,9 +254,7 @@ namespace Render {
             this._viewMode = v
         }
 
-        updateViewZPos() {
-            this.viewZPos = this.spriteMotionZ[this.sprSelf.id].p + (this.sprSelf._height as any as number) - (2 << fpx)
-        }
+
 
         takeoverSceneSprites() {
             const sc_allSprites = game.currentScene().allSprites
@@ -379,7 +381,6 @@ namespace Render {
             this.sprSelf = sprites.create(image.create(this.tilemapScaleSize >> 1, this.tilemapScaleSize >> 1), SpriteKind.Player)
             this.takeoverSceneSprites()
             this.sprites.removeElement(this.sprSelf)
-            this.updateViewZPos()
             scene.cameraFollowSprite(this.sprSelf)
             this.updateSelfImage()
 
@@ -485,8 +486,8 @@ namespace Render {
                 //landing
                 if ((motionZ.a >= 0 && motionZ.v > 0 && motionZ.p > motionZ.offset) ||
                     (motionZ.a <= 0 && motionZ.v < 0 && motionZ.p < motionZ.offset)) { motionZ.p = motionZ.offset, motionZ.v = 0 }
-                if (spr === this.sprSelf)
-                    this.updateViewZPos()
+             //   if (spr === this.sprSelf)
+             //       this.updateViewZPos()
             }
 
         }
@@ -530,7 +531,7 @@ namespace Render {
             let drawStart = 0
             let drawHeight = 0
             //(this.sprSelf._height as any as number)
-            this.viewZPos = this.spriteMotionZ[this.sprSelf.id].p + 4500  + this.cameraOffsetZ_fpx
+            this.viewZPos = Fx14(0.5) //this.spriteMotionZ[this.sprSelf.id].p + 4500  + this.cameraOffsetZ_fpx
             let cameraRangeAngle = Math.atan(this.fov) + .1 //tolerance for spr center just out of camera
             //debug
             // const ms=control.millis()
@@ -648,8 +649,8 @@ namespace Render {
                 //     texX = tex.width - texX - 1;
 
                 const lineHeight = (this.wallHeightInView / perpWallDist)
-                let drawEnd = lineHeight * this.viewZPos / this.tilemapScaleSize / fpx_scale;
-                const horizontBreak = 1 - this.viewZPos / this.tilemapScaleSize / fpx_scale;
+                let drawEnd = lineHeight * F14.toFloat(this.viewZPos)/// this.tilemapScaleSize  ;
+                const horizontBreak = 1 - drawEnd ;
                      
                     drawStart = drawEnd - lineHeight * (this._wallZScale) ;
                     drawHeight = (Math.ceil(drawEnd) - Math.ceil(drawStart) )
@@ -677,11 +678,11 @@ namespace Render {
             let fmapX14 = Fx14((this.selfXFpx / fpx_scale -1 ) * this.tilemapScaleSize)
             let fmapY14 = Fx14((this.selfYFpx / fpx_scale -1 ) * this.tilemapScaleSize)
         //    let posZ = (SH * this.viewZPos / fpx_scale)
-            let posZ14 = Fx14(SH * this.viewZPos  / fpx_scale )
+            let posZ14 = F14.mulLL(Fx14(SH * this.tilemapScaleSize ) , this.viewZPos )
             for (let y = floorStartY;  y < SH; y++) {
 
          //       let rowDistance = (posZ / (y - SHHalf)) 
-                let rowDistance14 = F14.idiv(posZ14, (y - 30))
+                let rowDistance14 = F14.idiv(posZ14 , (y - 30))
          //       let floorStepX = rowDistance *  stepDirX
          //       let floorStepY = rowDistance * stepDirY
                 let floorStepX14 = F14.mulLL(rowDistance14, Fx14(stepDirX))
@@ -785,7 +786,7 @@ namespace Render {
                 return
 
             const lineHeight = Math.idiv(this.wallHeightInView, transformY)
-            const drawStart = SHHalf + (lineHeight * ((this.viewZPos - this.spriteMotionZ[spr.id].p - (spr._height as any as number)) / this.tilemapScaleSize) >> fpx)
+            const drawStart = SHHalf + (lineHeight * ((F14.toFloat(this.viewZPos) - this.spriteMotionZ[spr.id].p - (spr._height as any as number)) / this.tilemapScaleSize) >> fpx)
 
             //for textures=image[][], abandoned
             //    const texSpr = spr.getTexture(Math.floor(((Math.atan2(spr.vxFx8, spr.vyFx8) - myAngle) / Math.PI / 2 + 2-.25) * spr.textures.length +.5) % spr.textures.length)
