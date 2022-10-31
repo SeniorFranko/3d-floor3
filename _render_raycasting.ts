@@ -1,3 +1,5 @@
+//
+
 //% shim=pxt::updateScreen
 function updateScreen(img: Image) { }
 
@@ -6,6 +8,15 @@ enum ViewMode {
     tilemapView,
     //% block="Raycasting Mode"
     raycastingView,
+}
+
+enum WallsType {
+    //% block="Fast"
+    blitRow,
+    //% block="Precise"
+    blitRowBreak,
+    //% block="Precise Trans"
+    blitRowBreakTrans,
 }
 
 namespace Render {
@@ -108,7 +119,7 @@ namespace Render {
         //     this.sprSelf._y = v * this.tilemapScaleSize as any as Fx8
         // }
 
-        get dirX(): number {
+        get dirX(): number { 
             return this.dirXFpx / fpx_scale
         }
 
@@ -518,8 +529,8 @@ namespace Render {
 
             let drawStart = 0
             let drawHeight = 0
-            let lastDist = -1, lastTexX = -1, lastMapX = -1, lastMapY = -1 //(this.sprSelf._height as any as number)
-            this.viewZPos = this.spriteMotionZ[this.sprSelf.id].p + 500  + this.cameraOffsetZ_fpx
+            //(this.sprSelf._height as any as number)
+            this.viewZPos = this.spriteMotionZ[this.sprSelf.id].p + 4500  + this.cameraOffsetZ_fpx
             let cameraRangeAngle = Math.atan(this.fov) + .1 //tolerance for spr center just out of camera
             //debug
             // const ms=control.millis()
@@ -550,7 +561,7 @@ namespace Render {
             
             
             // walls
-            
+            let skip = 0
             for (let x = 0; x < SW; x++) {
                 const cameraX: number = one - Math.idiv(((x + this.cameraOffsetX) << fpx) << 1, SW)
                 let rayDirX = this.dirXFpx + (this.planeX * cameraX >> fpx)
@@ -639,18 +650,12 @@ namespace Render {
                 const lineHeight = (this.wallHeightInView / perpWallDist)
                 let drawEnd = lineHeight * this.viewZPos / this.tilemapScaleSize / fpx_scale;
                 const horizontBreak = 1 - this.viewZPos / this.tilemapScaleSize / fpx_scale;
-                if (perpWallDist !== lastDist && (texX !== lastTexX || mapX !== lastMapX || mapY !== lastMapY)) {//neighbor line of tex share same parameters
                      
                     drawStart = drawEnd - lineHeight * (this._wallZScale) ;
                     drawHeight = (Math.ceil(drawEnd) - Math.ceil(drawStart) )
-                    drawStart += (SH >> 1)
-                    drawEnd += (SH >> 1)
+                    drawStart += 30 //(SH >> 1)
+                    drawEnd += 30//(SH >> 1)
 
-                    lastDist = perpWallDist
-                    lastTexX = texX
-                    lastMapX = mapX
-                    lastMapY = mapY
-                }
                 //fix start&end points to avoid regmatic between lines
                
 
@@ -676,7 +681,7 @@ namespace Render {
             for (let y = floorStartY;  y < SH; y++) {
 
          //       let rowDistance = (posZ / (y - SHHalf)) 
-                let rowDistance14 = F14.idiv(posZ14, (y - SHHalf))
+                let rowDistance14 = F14.idiv(posZ14, (y - 30))
          //       let floorStepX = rowDistance *  stepDirX
          //       let floorStepY = rowDistance * stepDirY
                 let floorStepX14 = F14.mulLL(rowDistance14, Fx14(stepDirX))
@@ -711,7 +716,7 @@ namespace Render {
             //debug
             // info.setScore(control.millis()-ms)
             let test = this.spriteMotionZ[this.sprSelf.id].p//(2 << fpx) + this.cameraOffsetZ_fpx//(this.sprSelf._height as any as number)
-            this.tempScreen.print(this.viewZPos.toString(), 0,0,7 )
+            this.tempScreen.print(skip.toString(), 0,0,7 )
            // this.tempScreen.print([Math.roundWithPrecision(this._angle, 3)].join(), 20, 5)
 
             this.drawSprites()
