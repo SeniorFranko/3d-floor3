@@ -566,37 +566,6 @@ namespace Render {
             this.tempScreen.drawImage(sc.background.image, -backgroundOffset , 0)
 
  
-            /*
-                           //
-             //  let rayDirX14 = F14.add(this.dirX14 ,  F14.mulLL(this.planeX14 , cameraX14))// >> fpx)
-              //  let rayDirY14 = F14.add(this.dirY14 ,  F14.mulLL(this.planeY14 , cameraX14))// >> fpx)
-
-                // length of ray from current position to next x or y-side
-                let sideDistX14 = F14.zeroFx14, sideDist14Y = F14.zeroFx14
-
-                //calculate step and initial sideDist
-              // const deltaDistX14 = F14.abs(F14.divMM(F14.oneFx14, rayDirX14));
-               // const deltaDistY14 = F14.abs(F14.divMM(F14.oneFx14, rayDirY14));;
-
-                    /*
-                if (rayDirX < F14.zeroFx14) {
-                    mapStepX = -1;
-                    //sideDistX = Fx14(((this.selfXFpx - (mapX << fpx)) * F14.toFloat(deltaDistX)) )
-                    sideDistX = F14.sub(this.selfX14,  F14.imul (deltaDistX ,mapX))
-                } else {
-                    mapStepX = 1;
-                    //                  sideDistX = Fx14((((mapX << fpx) + one - this.selfXFpx) * deltaDistX) >> fpx)
-                    sideDistX = F14.imul(deltaDistX, mapX + 1 - F14.toFloat(this.selfX14))
-                }
-                if (rayDirY < F14.zeroFx14) {
-                    mapStepY = -1;
-                    sideDistY = F14.sub(this.selfY14 , F14.imul(deltaDistY, mapY))
-                } else {
-                    mapStepY = 1;
-                    sideDistY = F14.imul(deltaDistY, mapY + 1 - F14.toFloat(this.selfY14))
-                    //Fx14((((mapY << fpx) + one - this.selfYFpx) * deltaDistY) >> fpx)
-                }
-*/
 
 
  
@@ -607,11 +576,14 @@ namespace Render {
                 const cameraX: number = one - Math.idiv(((x + this.cameraOffsetX) << fpx) << 1, SW)
                 const cameraX14 = Fx14(1 - x / SWHalf)
 
-                debugA = (cameraX /256)
-                debugB = F14.toFloat(cameraX14)
+ 
 
                 let rayDirX = this.dirXFpx + (this.planeX * cameraX >> fpx)
                 let rayDirY = this.dirYFpx + (this.planeY * cameraX >> fpx)
+                let rayDirX14 = F14.add(this.dirX14, F14.mulLL(this.planeX14, cameraX14))
+                let rayDirY14 = F14.add(this.dirY14, F14.mulLL(this.planeY14, cameraX14))
+
+
 
                 // avoid division by zero
                 if (rayDirX == 0) rayDirX = 1
@@ -622,19 +594,25 @@ namespace Render {
 
                 // length of ray from current position to next x or y-side
                 let sideDistX = 0, sideDistY = 0
+                let sideDistX14 = F14.zeroFx14, sideDistY14 = F14.zeroFx14
 
                 // length of ray from one x or y-side to next x or y-side
                 const deltaDistX = Math.abs(Math.idiv(one2, rayDirX));
                 const deltaDistY = Math.abs(Math.idiv(one2, rayDirY));
+                const deltaDistX14 = F14.abs(F14.divMM(F14.oneFx14, rayDirX14));
+                const deltaDistY14 = F14.abs(F14.divMM(F14.oneFx14, rayDirY14));
+
+
 
                 let mapStepX = 0, mapStepY = 0
+                let mapStepX14 = 0, mapStepY14 = 0
 
                 let sideWallHit = false;
 
                 //calculate step and initial sideDist
-                if (rayDirX < 0) {
+                if (rayDirX < 0) { //
                     mapStepX = -1;
-                    sideDistX = ((this.selfXFpx - (mapX << fpx)) * deltaDistX) >> fpx;
+                    sideDistX =  ((this.selfXFpx - (mapX << fpx)) * deltaDistX) >> fpx;
                 } else {
                     mapStepX = 1;
                     sideDistX = (((mapX << fpx) + one - this.selfXFpx) * deltaDistX) >> fpx;
@@ -647,11 +625,32 @@ namespace Render {
                     sideDistY = (((mapY << fpx) + one - this.selfYFpx) * deltaDistY) >> fpx;
                 }
 
+                if (rayDirX14 < F14.zeroFx14) {
+                    mapStepX = -1;
+                    sideDistX14 = F14.mulLL(deltaDistX14, F14.sub(this.selfX14, Fx14(mapX)))
+                } else {
+                    mapStepX = 1;
+                    sideDistX14 = F14.mulLL(deltaDistX14, F14.sub(Fx14(mapX + 1), this.selfX14))
+                }
+                if (rayDirY14 < F14.zeroFx14) {
+                    mapStepY = -1;
+                    sideDistY14 = F14.mulLL(deltaDistY14, F14.sub(this.selfY14, Fx14(mapY)))
+                } else {
+                    mapStepY = 1;
+                    sideDistY14 = F14.mulLL(deltaDistY14, F14.sub(Fx14(mapY + 1), this.selfY14))
+                    
+                }
+
+                if (x == SWHalf) {
+                debugA = (sideDistY / 256)
+                debugB = F14.toFloat(sideDistY14)
+                }
+
                 let color = 0
 
                 while (true) {
                     //jump to next map square, OR in x-direction, OR in y-direction
-                    if (sideDistX < sideDistY) {
+                    if (sideDistX14 < sideDistY14) {
                         sideDistX += deltaDistX;
                         mapX += mapStepX;
                         sideWallHit = false;
@@ -727,7 +726,7 @@ namespace Render {
             let fmapX14 = Fx14((this.selfXFpx / fpx_scale -1 ) * this.tilemapScaleSize)
             let fmapY14 = Fx14((this.selfYFpx / fpx_scale -1 ) * this.tilemapScaleSize)
             let posZ14 = F14.mulLL(Fx14(SH * this.tilemapScaleSize ) , this.viewZPos14 )
-            for (let y = SHHalf;  y < SH; y++) {
+            for (let y = SHHalf+1;  y < SH; y++) {
                 let rowDistance14 = F14.idiv(posZ14 , (y - SHHalf))
                 let floorStepX14 = F14.mulLL(rowDistance14, Fx14(stepDirX))
                 let floorStepY14 = F14.mulLL(rowDistance14, Fx14(stepDirY))
