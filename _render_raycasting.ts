@@ -651,11 +651,11 @@ namespace Render {
                 while (true) {
                     //jump to next map square, OR in x-direction, OR in y-direction
                     if (sideDistX14 < sideDistY14) {
-                        sideDistX += deltaDistX;
+                        sideDistX14 = F14.add(sideDistX14,deltaDistX14);
                         mapX += mapStepX;
                         sideWallHit = false;
                     } else {
-                        sideDistY += deltaDistY;
+                        sideDistY14 = F14.add(sideDistY14, deltaDistY14);
                         mapY += mapStepY;
                         sideWallHit = true;
                     }
