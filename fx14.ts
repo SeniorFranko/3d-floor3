@@ -130,6 +130,10 @@ namespace F14 {
         // For testing only, a float-based version
         return Fx14(F14.toFloat(a) / F14.toFloat(b))
     }
+
+    export function mod(v: Fx14) {
+        return ((v as any as number) & 0x3fff) as any as Fx14;
+    }
     /*
     // this one doesn't work
     export function divLL(a: Fx14, b: Fx14) {

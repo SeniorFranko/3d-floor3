@@ -641,10 +641,6 @@ namespace Render {
                     
                 }
 
-                if (x == SWHalf) {
-                debugA = (sideDistY / 256)
-                debugB = F14.toFloat(sideDistY14)
-                }
 
                 let color = 0
 
@@ -672,34 +668,51 @@ namespace Render {
 
                 let perpWallDist = 0
                 let wallX = 0
-                if (!sideWallHit) {
+                let perpWallDist14 = F14.zeroFx14
+                let wallX14 = F14.zeroFx14
+                if (!sideWallHit) { 
                     perpWallDist = Math.idiv(((mapX << fpx) - this.selfXFpx + (1 - mapStepX << fpx - 1)) << fpx, rayDirX)
                     wallX = this.selfYFpx + (perpWallDist * rayDirY >> fpx);
+                    perpWallDist14 = F14.divMM(F14.sub(Fx14(mapX + 0.5 - mapStepX / 2), this.selfX14), rayDirX14)
+                    wallX14 = F14.add(this.selfY14, F14.mulLL(perpWallDist14, rayDirY14))
                 } else {
-                    perpWallDist = Math.idiv(((mapY << fpx) - this.selfYFpx + (1 - mapStepY << fpx - 1)) << fpx, rayDirY)
+                    perpWallDist = Math.idiv(((mapY << fpx) - this.selfYFpx + (1- mapStepY << fpx -1 )) << fpx, rayDirY)
+                    perpWallDist14 = F14.divMM(F14.sub(Fx14(mapY + 0.5 - mapStepY / 2), this.selfY14), rayDirY14)
                     wallX = this.selfXFpx + (perpWallDist * rayDirX >> fpx);
+                    wallX14 = F14.add(this.selfX14, F14.mulLL(perpWallDist14, rayDirX14))
                 }
                 wallX &= FPX_MAX
-
-                // color = (color - 1) * 2
-                // if (sideWallHit) color++
+                wallX14 = F14.mod(wallX14)
 
                 const tex = this.textures[color]
                 if (!tex)
                     continue
 
-                let texX = (wallX * tex.width) >> fpx;
+               // let texX = (wallX * tex.width) >> fpx;
+                let texX = F14.toFloat(wallX14) * tex.width
                 // if ((!sideWallHit && rayDirX > 0) || (sideWallHit && rayDirY < 0))
                 //     texX = tex.width - texX - 1;
 
                 const lineHeight = (this.wallHeightInView / perpWallDist)
+                const lineHeight14 = F14.divMM(Fx14(this.wallHeightInView >> fpx) , perpWallDist14)
+
+
+
                 let drawEnd = lineHeight * this.viewZPos / this.tilemapScaleSize / fpx_scale;
-                const horizontBreak = 1 - this.viewZPos / this.tilemapScaleSize / fpx_scale;
+                let drawEnd14 = F14.mulLL(lineHeight14 , this.viewZPos14 )
+
+                if (x == SWHalf) {
+                    debugA = (drawEnd  )
+                    debugB = F14.toFloat(drawEnd14)
+                }
+
+
+                //const horizontBreak = 1 - this.viewZPos / this.tilemapScaleSize / fpx_scale;
               
-                    drawStart = drawEnd - lineHeight * (this._wallZScale);
-                    drawHeight = (Math.ceil(drawEnd) - Math.ceil(drawStart))
-                    drawStart += (SH >> 1)
-                    drawEnd += (SH >> 1)
+                drawStart = drawEnd - lineHeight * (this._wallZScale);
+                drawHeight = (Math.ceil(drawEnd) - Math.ceil(drawStart))
+                drawStart += SHHalf
+                drawEnd += SHHalf
 
   
                 
