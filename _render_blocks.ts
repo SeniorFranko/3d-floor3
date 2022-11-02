@@ -129,6 +129,10 @@ namespace Render {
         raycastingRender.viewMode = raycastingRender.viewMode == ViewMode.tilemapView ? ViewMode.raycastingView : ViewMode.tilemapView
     }
 
+    export function changePrecision() {
+        raycastingRender.f14precision = !raycastingRender.f14precision
+    }
+
     /**
      * Current view mode is the specific one?
      * @param viewMode

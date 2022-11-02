@@ -106,7 +106,8 @@ namespace Render {
 
         //floor
         wallEnd: number[] = []  //X
-        floorImage: Image 
+        floorImage: Image
+        f14precision: Boolean  = false
 
         onSpriteDirectionUpdateHandler: (spr: Sprite, dir: number) => void
 
@@ -304,6 +305,7 @@ namespace Render {
                 sprite_as_any.sayEndTime = undefined
             }
         }
+
 
         tilemapLoaded() {
             const sc = game.currentScene()
@@ -538,81 +540,52 @@ namespace Render {
 
             //floor
             let floorStartY = SH
-
-            this.selfXFpx = this.xFpx
-            this.selfYFpx = this.yFpx
-            this.selfX14 = Fx14(this.sprSelf.x / this.tilemapScaleSize)
-            this.selfY14 = Fx14(this.sprSelf.y / this.tilemapScaleSize)
-           // let mapX = Math.floor(this.sprSelf.x  / this.tilemapScaleSize)
-           // let mapY = Math.floor(this.sprSelf.y  / this.tilemapScaleSize)
-            
-
-            let drawStart = 0
+             let drawStart = 0
             let drawHeight = 0
-            //(this.sprSelf._height as any as number)
-            this.viewZPos = (this.sprSelf._height as any as number)
-            this.viewZPos14 = Fx14(0.5)
             let cameraRangeAngle = Math.atan(this.fov) + .1 //tolerance for spr center just out of camera
             //debug
             // const ms=control.millis()
 
-            const sc = game.currentScene() 
-           // background
-            const speed = 2 // 2: normal speed
-            let backgroundOffset = (this._angle / Math.PI * speed ) % 1  // range -1..1
-            if (backgroundOffset < 0) backgroundOffset++  // range 0..1
-            backgroundOffset *= SW    // range 0..screenwidth
-            this.tempScreen.drawImage(sc.background.image, -backgroundOffset +SW,0)
-            this.tempScreen.drawImage(sc.background.image, -backgroundOffset , 0)
-
- 
-
-
- 
+            const sc = game.currentScene()
+            // background
+          //  const speed = 2 // 2: normal speed
+          //  let backgroundOffset = (this._angle / Math.PI * speed) % 1  // range -1..1
+          //  if (backgroundOffset < 0) backgroundOffset++  // range 0..1
+          //  backgroundOffset *= SW    // range 0..screenwidth
+          //  this.tempScreen.drawImage(sc.background.image, -backgroundOffset + SW, 0)
+          //  this.tempScreen.drawImage(sc.background.image, -backgroundOffset, 0)
+          this.tempScreen.fill(0)
             // walls
-            let debugA 
-            let debugB 
+            let debugA
+            let debugB
+
+
+            if (!this.f14precision) {
+                this.selfXFpx = this.xFpx
+                this.selfYFpx = this.yFpx
+                this.viewZPos = (this.sprSelf._height as any as number)
             for (let x = 0; x < SW; x++) {
                 const cameraX: number = one - Math.idiv(((x + this.cameraOffsetX) << fpx) << 1, SW)
-                const cameraX14 = Fx14(1 - x / SWHalf)
-
- 
-
                 let rayDirX = this.dirXFpx + (this.planeX * cameraX >> fpx)
                 let rayDirY = this.dirYFpx + (this.planeY * cameraX >> fpx)
-                let rayDirX14 = F14.add(this.dirX14, F14.mulLL(this.planeX14, cameraX14))
-                let rayDirY14 = F14.add(this.dirY14, F14.mulLL(this.planeY14, cameraX14))
-
-
-
-                // avoid division by zero
                 if (rayDirX == 0) rayDirX = 1
                 if (rayDirY == 0) rayDirY = 1
-
                 let mapX = this.selfXFpx >> fpx
                 let mapY = this.selfYFpx >> fpx
 
                 // length of ray from current position to next x or y-side
                 let sideDistX = 0, sideDistY = 0
-                let sideDistX14 = F14.zeroFx14, sideDistY14 = F14.zeroFx14
 
                 // length of ray from one x or y-side to next x or y-side
                 const deltaDistX = Math.abs(Math.idiv(one2, rayDirX));
                 const deltaDistY = Math.abs(Math.idiv(one2, rayDirY));
-                const deltaDistX14 = F14.abs(F14.divMM(F14.oneFx14, rayDirX14));
-                const deltaDistY14 = F14.abs(F14.divMM(F14.oneFx14, rayDirY14));
-
-
-
                 let mapStepX = 0, mapStepY = 0
-                let mapStepX14 = 0, mapStepY14 = 0
-
                 let sideWallHit = false;
 
                 //calculate step and initial sideDist
                 if (rayDirX < 0) { //
                     mapStepX = -1;
-                    sideDistX =  ((this.selfXFpx - (mapX << fpx)) * deltaDistX) >> fpx;
+                    sideDistX = ((this.selfXFpx - (mapX << fpx)) * deltaDistX) >> fpx;
                 } else {
                     mapStepX = 1;
                     sideDistX = (((mapX << fpx) + one - this.selfXFpx) * deltaDistX) >> fpx;
@@ -624,6 +597,91 @@ namespace Render {
                     mapStepY = 1;
                     sideDistY = (((mapY << fpx) + one - this.selfYFpx) * deltaDistY) >> fpx;
                 }
+
+                let color = 0
+
+                while (true) {
+                    //jump to next map square, OR in x-direction, OR in y-direction
+                    if (sideDistX < sideDistY) {
+                        sideDistX += deltaDistX;
+                        mapX += mapStepX;
+                        sideWallHit = false;
+                    } else {
+                        sideDistY += deltaDistY;
+                        mapY += mapStepY;
+                        sideWallHit = true;
+                    }
+
+                    if (this.map.isOutsideMap(mapX, mapY))
+                        break
+                    color = this.map.getTile(mapX, mapY)
+                    if (this.map.isWall(mapX, mapY))
+                        break; // hit!
+                }
+
+                if (this.map.isOutsideMap(mapX, mapY))
+                    continue
+
+                let perpWallDist = 0
+                let wallX = 0
+                if (!sideWallHit) {
+                    perpWallDist = Math.idiv(((mapX << fpx) - this.selfXFpx + (1 - mapStepX << fpx - 1)) << fpx, rayDirX)
+                    wallX = this.selfYFpx + (perpWallDist * rayDirY >> fpx);
+                } else {
+                    perpWallDist = Math.idiv(((mapY << fpx) - this.selfYFpx + (1 - mapStepY << fpx - 1)) << fpx, rayDirY)
+                    wallX = this.selfXFpx + (perpWallDist * rayDirX >> fpx);
+                }
+                wallX &= FPX_MAX
+
+               const tex = this.textures[color]
+                if (!tex)
+                    continue
+
+                let texX = (wallX * tex.width) >> fpx;
+                //let texX = F14.toFloat(wallX14) * tex.width
+                // if ((!sideWallHit && rayDirX > 0) || (sideWallHit && rayDirY < 0))
+                //     texX = tex.width - texX - 1;
+
+                const lineHeight = (this.wallHeightInView / perpWallDist)
+
+                let drawEnd = lineHeight * this.viewZPos / this.tilemapScaleSize / fpx_scale;
+
+                drawStart = drawEnd- lineHeight;
+                drawHeight = Math.ceil(drawEnd) - Math.ceil(drawStart)
+                drawStart = SHHalf + Math.ceil(drawStart)
+                drawEnd += SHHalf
+
+
+
+                //fix start&end points to avoid regmatic between lines
+
+
+                this.tempScreen.blitRow(x, drawStart, tex, texX, drawHeight)
+                //    this.blitRowBreak(x, SHHalf + drawEnd - lineHeight, SHHalf + drawEnd, tex, texX, tex.height * horizontBreak)
+               // this.wallEnd[x] = Math.ceil(drawStart) + drawHeight
+               // if (this.wallEnd[x] < floorStartY) floorStartY = this.wallEnd[x]
+                this.dist[x] = perpWallDist
+
+
+            }
+            }else {
+
+                this.selfX14 = Fx14(this.sprSelf.x / this.tilemapScaleSize)
+                this.selfY14 = Fx14(this.sprSelf.y / this.tilemapScaleSize)
+                this.selfXFpx = this.xFpx
+                this.selfYFpx = this.yFpx
+                this.viewZPos14 = Fx14(0.5)
+            for (let x = 0; x < SW; x++) {
+                const cameraX14 = Fx14(1 - x / SWHalf)
+                let rayDirX14 = F14.add(this.dirX14, F14.mulLL(this.planeX14, cameraX14))
+                let rayDirY14 = F14.add(this.dirY14, F14.mulLL(this.planeY14, cameraX14))
+                let mapX = this.selfXFpx >> fpx
+                let mapY = this.selfYFpx >> fpx
+                let sideDistX14 = F14.zeroFx14, sideDistY14 = F14.zeroFx14
+                const deltaDistX14 = F14.abs(F14.divMM(F14.oneFx14, rayDirX14))
+                const deltaDistY14 = F14.abs(F14.divMM(F14.oneFx14, rayDirY14))
+                let mapStepX = 0, mapStepY = 0
+                let sideWallHit = false;
 
                 if (rayDirX14 < F14.zeroFx14) {
                     mapStepX = -1;
@@ -637,13 +695,9 @@ namespace Render {
                     sideDistY14 = F14.mulLL(deltaDistY14, F14.sub(this.selfY14, Fx14(mapY)))
                 } else {
                     mapStepY = 1;
-                    sideDistY14 = F14.mulLL(deltaDistY14, F14.sub(Fx14(mapY + 1), this.selfY14))
-                    
+                    sideDistY14 = F14.mulLL(deltaDistY14, F14.sub(Fx14(mapY + 1), this.selfY14))              
                 }
-
-
                 let color = 0
-
                 while (true) {
                     //jump to next map square, OR in x-direction, OR in y-direction
                     if (sideDistX14 < sideDistY14) {
@@ -662,57 +716,29 @@ namespace Render {
                     if (this.map.isWall(mapX, mapY))
                         break; // hit!
                 }
-
                 if (this.map.isOutsideMap(mapX, mapY))
                     continue
-
-                let perpWallDist = 0
-                let wallX = 0
                 let perpWallDist14 = F14.zeroFx14
                 let wallX14 = F14.zeroFx14
                 if (!sideWallHit) { 
-                    perpWallDist = Math.idiv(((mapX << fpx) - this.selfXFpx + (1 - mapStepX << fpx - 1)) << fpx, rayDirX)
-                    wallX = this.selfYFpx + (perpWallDist * rayDirY >> fpx);
                     perpWallDist14 = F14.divMM(F14.sub(Fx14(mapX + 0.5 - mapStepX / 2), this.selfX14), rayDirX14)
                     wallX14 = F14.add(this.selfY14, F14.mulLL(perpWallDist14, rayDirY14))
                 } else {
-                    perpWallDist = Math.idiv(((mapY << fpx) - this.selfYFpx + (1- mapStepY << fpx -1 )) << fpx, rayDirY)
                     perpWallDist14 = F14.divMM(F14.sub(Fx14(mapY + 0.5 - mapStepY / 2), this.selfY14), rayDirY14)
-                    wallX = this.selfXFpx + (perpWallDist * rayDirX >> fpx);
                     wallX14 = F14.add(this.selfX14, F14.mulLL(perpWallDist14, rayDirX14))
                 }
-                wallX &= FPX_MAX
                 wallX14 = F14.mod(wallX14)
 
                 const tex = this.textures[color]
                 if (!tex)
                     continue
-
-               // let texX = (wallX * tex.width) >> fpx;
                 let texX = F14.toFloat(wallX14) * tex.width
-                // if ((!sideWallHit && rayDirX > 0) || (sideWallHit && rayDirY < 0))
-                //     texX = tex.width - texX - 1;
-
-                const lineHeight = (this.wallHeightInView / perpWallDist)
                 const lineHeight14 = F14.divMM(Fx14(this.wallHeightInView >> fpx) , perpWallDist14)
-
-
-
-                let drawEnd = lineHeight * this.viewZPos / this.tilemapScaleSize / fpx_scale;
                 let drawEnd14 = F14.mulLL(lineHeight14 , this.viewZPos14 )
-
-                if (x == SWHalf) {
-                    debugA = (drawEnd  )
-                    debugB = F14.toFloat(drawEnd14)
-                }
-
-
-                //const horizontBreak = 1 - this.viewZPos / this.tilemapScaleSize / fpx_scale;
-              
-                drawStart = drawEnd - lineHeight * (this._wallZScale);
-                drawHeight = (Math.ceil(drawEnd) - Math.ceil(drawStart))
-                drawStart += SHHalf
-                drawEnd += SHHalf
+                drawStart = F14.toFloat(F14.sub(drawEnd14,lineHeight14)) ;
+                drawHeight = Math.ceil (Math.floor(F14.toFloat(drawEnd14)) - Math.ceil(drawStart))
+                drawStart = SHHalf + Math.ceil(drawStart)
+                //drawEnd += SHHalf
 
   
                 
@@ -721,14 +747,14 @@ namespace Render {
 
                 this.tempScreen.blitRow(x, drawStart, tex, texX, drawHeight)
                 //    this.blitRowBreak(x, SHHalf + drawEnd - lineHeight, SHHalf + drawEnd, tex, texX, tex.height * horizontBreak)
-                this.wallEnd[x] = Math.ceil(drawStart) + drawHeight
-                if (this.wallEnd[x] < floorStartY) floorStartY = this.wallEnd[x]
-                this.dist[x] = perpWallDist
+              //  this.wallEnd[x] = Math.ceil(drawStart) + drawHeight
+                //if (this.wallEnd[x] < floorStartY) floorStartY = this.wallEnd[x]
+                //this.dist[x] = perpWallDist
 
 
-            }  /**/
-
-
+            }  
+            }
+/*
             //floor       
             let rayDirX0 = this.dirXFpx / fpx_scale + (this.planeX / fpx_scale)
             let rayDirY0 = this.dirYFpx / fpx_scale + (this.planeY / fpx_scale)
@@ -760,15 +786,15 @@ namespace Render {
                     floorY14 = F14.add(floorY14, floorStepY14)
                 }
             }
-
+*/
             //debug
             // info.setScore(control.millis()-ms)
-            let test = this.spriteMotionZ[this.sprSelf.id].p//(2 << fpx) + this.cameraOffsetZ_fpx//(this.sprSelf._height as any as number)
-            this.tempScreen.print(debugA.toString(), 0,0,7 )
-            this.tempScreen.print(debugB.toString(), 0, 10, 7)
+           // let test = this.spriteMotionZ[this.sprSelf.id].p//(2 << fpx) + this.cameraOffsetZ_fpx//(this.sprSelf._height as any as number)
+            this.tempScreen.print(this.f14precision.toString(), 0,0,7 )
+           // this.tempScreen.print(debugB.toString(), 0, 10, 7)
            // this.tempScreen.print([Math.roundWithPrecision(this._angle, 3)].join(), 20, 5)
 
-            this.drawSprites()
+            //this.drawSprites()
         }
 
         drawSprites() {
